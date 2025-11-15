@@ -857,25 +857,66 @@ local function checkSkillCheck()
     local inPerfectZone = (diff >= offsetBefore - tolerance and diff <= offsetBefore + tolerance)
 
     local function pressJump()
-        local virtualInputManager = game:GetService("VirtualInputManager")
+        local localPlayer = Players.LocalPlayer
         
         if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-            -- Mobile: Tap posisi tombol jump default Roblox (kanan bawah)
-            local screenSize = workspace.CurrentCamera.ViewportSize
-            local tapX = screenSize.X * 0.85  -- Kanan
-            local tapY = screenSize.Y * 0.75  -- Bawah
-            
-            virtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, true, game, 0)
-            task.wait(0.01)
-            virtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, false, game, 0)
+            -- MOBILE: Klik langsung pada skill check GUI
+            pcall(function()
+                local playerGui = localPlayer:FindFirstChild("PlayerGui")
+                if not playerGui then return end
+                
+                local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
+                if not skillCheckGui then return end
+                
+                local check = skillCheckGui:FindFirstChild("Check")
+                if not check then return end
+                
+                -- Cari TextButton atau ImageButton di skill check
+                local clickable = check:FindFirstChildWhichIsA("TextButton") 
+                    or check:FindFirstChildWhichIsA("ImageButton")
+                    or skillCheckGui:FindFirstChildWhichIsA("TextButton")
+                    or skillCheckGui:FindFirstChildWhichIsA("ImageButton")
+                
+                if clickable and clickable.Visible then
+                    -- Simulasi klik pada button
+                    print("🔵 Clicking skill check button")
+                    
+                    for _, connection in pairs(getconnections(clickable.MouseButton1Click)) do
+                        connection:Fire()
+                    end
+                    
+                    for _, connection in pairs(getconnections(clickable.Activated)) do
+                        connection:Fire()
+                    end
+                    
+                    return
+                end
+                
+                -- Jika tidak ada button, coba touch event pada frame utama
+                local virtualInputManager = game:GetService("VirtualInputManager")
+                local screenGui = skillCheckGui
+                local absolutePos = screenGui.AbsolutePosition
+                local absoluteSize = screenGui.AbsoluteSize
+                
+                local centerX = absolutePos.X + (absoluteSize.X / 2)
+                local centerY = absolutePos.Y + (absoluteSize.Y / 2)
+                
+                print("🔵 Tapping at:", centerX, centerY)
+                
+                -- Simulasi touch
+                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+                task.wait(0.01)
+                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+            end)
         else
-            -- PC: Keyboard Space
+            -- PC: Gunakan Space key
+            local virtualInputManager = game:GetService("VirtualInputManager")
             virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
             task.wait(0.01)
             virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
         end
     end
-    
+   
     -- Only press if in perfect zone and haven't pressed this round
     if inPerfectZone and not pressedThisRound then
         local currentTime = tick()
