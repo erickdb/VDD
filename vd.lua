@@ -855,72 +855,6 @@ local function checkSkillCheck()
     
     -- Check if line is in the perfect zone
     local inPerfectZone = (diff >= offsetBefore - tolerance and diff <= offsetBefore + tolerance)
-
-    -- ===============
-    -- Test
-    -- =============
-    local function pressJump()
-        local localPlayer = Players.LocalPlayer
-        local virtualInputManager = game:GetService("VirtualInputManager")
-    
-        -- === MOBILE ===
-        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-            pcall(function()
-                local playerGui = localPlayer:FindFirstChild("PlayerGui")
-                if not playerGui then return end
-    
-                local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
-                if not skillCheckGui then return end
-    
-                local check = skillCheckGui:FindFirstChild("Check")
-                if not check then return end
-    
-                -- Cari button
-                local clickable =
-                    check:FindFirstChildWhichIsA("TextButton")
-                    or check:FindFirstChildWhichIsA("ImageButton")
-                    or skillCheckGui:FindFirstChildWhichIsA("TextButton")
-                    or skillCheckGui:FindFirstChildWhichIsA("ImageButton")
-    
-                -- Jika ketemu TextButton / ImageButton → TAPPING langsung di UI
-                if clickable and clickable.Visible then
-                    local pos = clickable.AbsolutePosition
-                    local size = clickable.AbsoluteSize
-    
-                    local x = pos.X + size.X/2
-                    local y = pos.Y + size.Y/2
-    
-                    print("🔵 Touching clickable at:", x, y)
-    
-                    -- TOUCH DOWN
-                    VirtualInputManager:SendTouchEvent(1, x, y, true, game)
-                    task.wait(0.02)
-    
-                    -- TOUCH UP
-                    VirtualInputManager:SendTouchEvent(1, x, y, false, game)
-                    return
-                end
-    
-                -- Jika tidak ada button, tap GUI utama
-                local pos = skillCheckGui.AbsolutePosition
-                local size = skillCheckGui.AbsoluteSize
-                local x = pos.X + size.X/2
-                local y = pos.Y + size.Y/2
-    
-                print("🔵 Touching main GUI at:", x, y)
-    
-                VirtualInputManager:SendTouchEvent(1, x, y, true, game)
-                task.wait(0.02)
-                VirtualInputManager:SendTouchEvent(1, x, y, false, game)
-            end)
-    
-        -- === PC ===
-        else
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.01)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-        end
-    end
    
     -- Only press if in perfect zone and haven't pressed this round
     if inPerfectZone and not pressedThisRound then
@@ -929,13 +863,12 @@ local function checkSkillCheck()
         if currentTime - lastPressTime >= 0.05 then
             -- Add 0.02 second (20ms) delay before pressing
             task.wait(0.02)
-
-            pressJump()
-            -- -- Simulate space key press
-            -- local virtualInputManager = game:GetService("VirtualInputManager")
-            -- virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            -- task.wait(0.01)
-            -- virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+            
+            -- Simulate space key press
+            local virtualInputManager = game:GetService("VirtualInputManager")
+            virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.01)
+            virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
             
             lastPressTime = currentTime
             pressedThisRound = true
