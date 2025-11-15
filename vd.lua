@@ -763,13 +763,205 @@ local function updateSpeedBoost(newValue)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- AUTO PERFECT GENERATOR FUNCTIONS - MOBILE OPTIMIZED
+-- AUTO PERFECT GENERATOR - NATIVE TOUCH METHOD
+-- Menggunakan touch screen langsung, bukan VirtualInputManager
 -- ═══════════════════════════════════════════════════════════════════════════
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local lastPressTime = 0
 local pressedThisRound = false
 local lastGoalRotationTracked = 0
 local lastSkillCheckActive = false
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- METHOD 1: NATIVE TOUCH SIMULATION (RECOMMENDED)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local function pressJumpNativeTouch()
+    local localPlayer = Players.LocalPlayer
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return false end
+    
+    local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
+    if not skillCheckGui then return false end
+    
+    pcall(function()
+        local check = skillCheckGui:FindFirstChild("Check")
+        if not check then return end
+        
+        -- METODE A: Fire GuiButton langsung dengan getconnections
+        local function tryClickButton()
+            for _, descendant in ipairs(skillCheckGui:GetDescendants()) do
+                if descendant:IsA("GuiButton") and descendant.Visible and descendant.Active then
+                    print("🔵 Found button:", descendant.Name, "- Clicking...")
+                    
+                    -- Fire semua event yang terhubung
+                    local success = false
+                    
+                    -- MouseButton1Click
+                    for _, connection in pairs(getconnections(descendant.MouseButton1Click)) do
+                        connection:Fire()
+                        success = true
+                    end
+                    
+                    -- MouseButton1Down
+                    for _, connection in pairs(getconnections(descendant.MouseButton1Down)) do
+                        connection:Fire()
+                        success = true
+                    end
+                    
+                    -- Activated
+                    for _, connection in pairs(getconnections(descendant.Activated)) do
+                        connection:Fire()
+                        success = true
+                    end
+                    
+                    if success then
+                        print("✅ Button clicked successfully!")
+                        return true
+                    end
+                end
+            end
+            return false
+        end
+        
+        -- METODE B: Simulasi InputBegan/InputEnded pada GuiObject
+        local function tryTouchSimulation()
+            local touchTarget = check or skillCheckGui
+            
+            if touchTarget:IsA("GuiObject") then
+                print("🔵 Simulating touch on:", touchTarget.Name)
+                
+                -- Buat InputObject palsu untuk touch
+                local fakeInputObject = {
+                    UserInputType = Enum.UserInputType.Touch,
+                    UserInputState = Enum.UserInputState.Begin,
+                    Position = Vector3.new(
+                        touchTarget.AbsolutePosition.X + (touchTarget.AbsoluteSize.X / 2),
+                        touchTarget.AbsolutePosition.Y + (touchTarget.AbsoluteSize.Y / 2),
+                        0
+                    )
+                }
+                
+                -- Fire InputBegan
+                for _, connection in pairs(getconnections(touchTarget.InputBegan)) do
+                    connection:Fire(fakeInputObject)
+                end
+                
+                -- Fire InputEnded
+                fakeInputObject.UserInputState = Enum.UserInputState.End
+                for _, connection in pairs(getconnections(touchTarget.InputEnded)) do
+                    connection:Fire(fakeInputObject)
+                end
+                
+                print("✅ Touch simulation completed!")
+                return true
+            end
+            return false
+        end
+        
+        -- Coba metode A dulu, jika gagal coba metode B
+        if not tryClickButton() then
+            tryTouchSimulation()
+        end
+    end)
+    
+    return true
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- METHOD 2: HYBRID - Touch + VirtualInputManager Fallback
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local function pressJumpHybrid()
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    
+    if isMobile then
+        print("🔵 [Mobile] Using native touch method")
+        
+        -- Coba native touch dulu
+        local success = pressJumpNativeTouch()
+        
+        if not success then
+            print("⚠ Native touch failed, using VIM fallback")
+            -- Fallback ke VirtualInputManager
+            local localPlayer = Players.LocalPlayer
+            local playerGui = localPlayer:FindFirstChild("PlayerGui")
+            if not playerGui then return end
+            
+            local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
+            if not skillCheckGui then return end
+            
+            pcall(function()
+                local virtualInputManager = game:GetService("VirtualInputManager")
+                local absolutePos = skillCheckGui.AbsolutePosition
+                local absoluteSize = skillCheckGui.AbsoluteSize
+                
+                local centerX = absolutePos.X + (absoluteSize.X / 2)
+                local centerY = absolutePos.Y + (absoluteSize.Y / 2)
+                
+                print("   VIM Tap at:", centerX, centerY)
+                
+                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+            end)
+        end
+    else
+        -- PC: Space key
+        print("🔵 [PC] Using Space key")
+        local virtualInputManager = game:GetService("VirtualInputManager")
+        virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+        task.wait(0.01)
+        virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+    end
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- METHOD 3: REMOTE EVENT (PALING RELIABLE JIKA ADA)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local function pressJumpRemoteEvent()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    pcall(function()
+        local remotes = ReplicatedStorage:WaitForChild("Remotes", 2)
+        if not remotes then 
+            print("❌ No Remotes folder found")
+            return 
+        end
+        
+        -- Cari remote yang berhubungan dengan skill check
+        local possibleNames = {
+            "SkillCheck",
+            "Generator",
+            "RepairEvent",
+            "SkillCheckEvent",
+            "PerfectPress",
+            "CheckPress"
+        }
+        
+        for _, name in ipairs(possibleNames) do
+            local remote = remotes:FindFirstChild(name, true) -- recursive search
+            if remote and remote:IsA("RemoteEvent") then
+                print("🔵 Found remote:", remote:GetFullName())
+                remote:FireServer(true) -- true = success/perfect
+                print("✅ Remote fired!")
+                return true
+            end
+        end
+        
+        print("⚠ No skill check remote found")
+    end)
+    
+    return false
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MAIN SKILL CHECK FUNCTION
+-- ═══════════════════════════════════════════════════════════════════════════
 
 local function checkSkillCheck()
     local localPlayer = Players.LocalPlayer
@@ -780,7 +972,6 @@ local function checkSkillCheck()
     
     local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
     if not skillCheckGui then 
-        -- Reset when skill check disappears
         pressedThisRound = false
         lastGoalRotationTracked = 0
         lastSkillCheckActive = false
@@ -803,13 +994,10 @@ local function checkSkillCheck()
         return 
     end
     
-    -- Get rotation values
     local lineRotation = line.Rotation
     local goalRotation = goal.Rotation
     
-    -- Don't press if Goal or Line is at 0 (skill check not started yet)
     if goalRotation == 0 or lineRotation == 0 then
-        -- Reset when skill check is not active
         if lastSkillCheckActive then
             pressedThisRound = false
             lastGoalRotationTracked = 0
@@ -818,20 +1006,17 @@ local function checkSkillCheck()
         return
     end
     
-    -- Skill check is now active
     if not lastSkillCheckActive then
         lastSkillCheckActive = true
         pressedThisRound = false
         lastGoalRotationTracked = goalRotation
     end
     
-    -- Detect new skill check (goal rotation changed significantly)
     if math.abs(goalRotation - lastGoalRotationTracked) > 10 then
         pressedThisRound = false
         lastGoalRotationTracked = goalRotation
     end
     
-    -- Normalize rotation values (handle 360 degree wrap)
     local function normalizeRotation(rot)
         while rot < 0 do rot = rot + 360 end
         while rot >= 360 do rot = rot - 360 end
@@ -841,133 +1026,62 @@ local function checkSkillCheck()
     lineRotation = normalizeRotation(lineRotation)
     goalRotation = normalizeRotation(goalRotation)
     
-    -- Calculate difference (considering rotation direction)
     local diff = lineRotation - goalRotation
-    
-    -- Normalize difference to handle 360° wrap
     while diff > 180 do diff = diff - 360 end
     while diff < -180 do diff = diff + 360 end
     
-    -- ════════════════════════════════════════════════════════════════════
-    -- MOBILE vs PC OFFSET - PENTING!
-    -- ════════════════════════════════════════════════════════════════════
+    -- Platform-specific offset
     local offsetBefore, tolerance
     local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
     
     if isMobile then
-        -- MOBILE: Butuh offset LEBIH BESAR karena:
-        -- 1. Touch simulation lebih lambat
-        -- 2. Frame rate mobile lebih rendah
-        -- 3. Processing delay lebih tinggi
-        offsetBefore = 115  -- Klik lebih awal (was 103)
-        tolerance = 3       -- Tolerance lebih besar (was 2)
+        offsetBefore = 118  -- Mobile: lebih awal lagi karena native touch lebih lambat
+        tolerance = 4
     else
-        -- PC: Offset original yang sudah fine-tuned
         offsetBefore = 103
         tolerance = 2
     end
     
-    -- Check if line is in the perfect zone
     local inPerfectZone = (diff >= offsetBefore - tolerance and diff <= offsetBefore + tolerance)
-
-    -- ════════════════════════════════════════════════════════════════════
-    -- PRESS JUMP FUNCTION
-    -- ════════════════════════════════════════════════════════════════════
-    local function pressJump()
-        if isMobile then
-            -- ═══════════════════════════════════════════════════════════
-            -- MOBILE: Multi-method approach untuk reliability maksimal
-            -- ═══════════════════════════════════════════════════════════
-            pcall(function()
-                local playerGui = localPlayer:FindFirstChild("PlayerGui")
-                if not playerGui then return end
-                
-                local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
-                if not skillCheckGui then return end
-                
-                local check = skillCheckGui:FindFirstChild("Check")
-                if not check then return end
-                
-                -- METHOD 1: Cari dan klik button dengan getconnections
-                local clickable = check:FindFirstChildWhichIsA("TextButton") 
-                    or check:FindFirstChildWhichIsA("ImageButton")
-                    or skillCheckGui:FindFirstChildWhichIsA("TextButton")
-                    or skillCheckGui:FindFirstChildWhichIsA("ImageButton")
-                
-                if clickable and clickable.Visible then
-                    print("🔵 [Mobile] Clicking button via connections")
-                    
-                    -- Fire MouseButton1Click
-                    for _, connection in pairs(getconnections(clickable.MouseButton1Click)) do
-                        connection:Fire()
-                    end
-                    
-                    -- Fire Activated
-                    for _, connection in pairs(getconnections(clickable.Activated)) do
-                        connection:Fire()
-                    end
-                    
-                    return
-                end
-                
-                -- METHOD 2: Tap di tengah GUI skill check
-                print("🔵 [Mobile] No button found, tapping center")
-                
-                local virtualInputManager = game:GetService("VirtualInputManager")
-                local absolutePos = skillCheckGui.AbsolutePosition
-                local absoluteSize = skillCheckGui.AbsoluteSize
-                
-                local centerX = absolutePos.X + (absoluteSize.X / 2)
-                local centerY = absolutePos.Y + (absoluteSize.Y / 2)
-                
-                print("   Tap position:", centerX, centerY)
-                
-                -- Simulasi touch TANPA DELAY (lebih cepat)
-                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-                virtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-            end)
-        else
-            -- ═══════════════════════════════════════════════════════════
-            -- PC: Standard keyboard Space
-            -- ═══════════════════════════════════════════════════════════
-            print("🔵 [PC] Pressing Space key")
-            
-            local virtualInputManager = game:GetService("VirtualInputManager")
-            virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.01)
-            virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-        end
-    end
-   
-    -- ════════════════════════════════════════════════════════════════════
-    -- TRIGGER PRESS WHEN IN PERFECT ZONE
-    -- ════════════════════════════════════════════════════════════════════
+    
     if inPerfectZone and not pressedThisRound then
         local currentTime = tick()
         
-        -- Prevent double pressing (minimum 0.05 second between presses)
         if currentTime - lastPressTime >= 0.05 then
+            print("🎯 Perfect zone! Diff:", string.format("%.2f", diff), "Target:", offsetBefore)
+            
+            -- NO DELAY untuk mobile
+            if not isMobile then
+                task.wait(0.02)
+            end
             
             -- ═══════════════════════════════════════════════════════════
-            -- DELAY OPTIMIZATION: Mobile vs PC
+            -- PILIH METHOD YANG MAU DIPAKAI (UNCOMMENT SALAH SATU):
             -- ═══════════════════════════════════════════════════════════
-            if isMobile then
-                -- MOBILE: NO DELAY - setiap ms berharga!
-                print("✅ [Mobile] Perfect zone hit! Diff:", diff, "Target:", offsetBefore)
-            else
-                -- PC: Small delay untuk fine-tuning timing
-                task.wait(0.02)
-                print("✅ [PC] Perfect zone hit! Diff:", diff, "Target:", offsetBefore)
-            end
-
-            -- Execute press
-            pressJump()
+            
+            -- Method 1: Native Touch (RECOMMENDED untuk mobile)
+            pressJumpHybrid()
+            
+            -- Method 2: Remote Event only (uncomment jika mau coba)
+            -- pressJumpRemoteEvent()
+            
+            -- Method 3: Try Remote first, fallback to touch (PALING AMAN)
+            -- if not pressJumpRemoteEvent() then
+            --     pressJumpHybrid()
+            -- end
             
             lastPressTime = currentTime
             pressedThisRound = true
         end
     end
 end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ENABLE/DISABLE FUNCTIONS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local autoPerfectEnabled = false
+local autoPerfectConnection = nil
 
 local function enableAutoPerfect()
     autoPerfectEnabled = true
@@ -976,15 +1090,14 @@ local function enableAutoPerfect()
         autoPerfectConnection:Disconnect()
     end
     
-    -- Monitor skill check continuously using RenderStepped for max frequency
     autoPerfectConnection = RunService.RenderStepped:Connect(function()
         if autoPerfectEnabled then
             pcall(checkSkillCheck)
         end
     end)
     
-    print("✅ Auto Perfect Generator ENABLED")
-    print("📱 Platform:", UserInputService.TouchEnabled and "MOBILE" or "PC")
+    local platform = UserInputService.TouchEnabled and "MOBILE (Native Touch)" or "PC"
+    print("✅ Auto Perfect ENABLED -", platform)
 end
 
 local function disableAutoPerfect()
@@ -995,8 +1108,15 @@ local function disableAutoPerfect()
         autoPerfectConnection = nil
     end
     
-    print("❌ Auto Perfect Generator DISABLED")
+    print("❌ Auto Perfect DISABLED")
 end
+
+-- Export functions
+return {
+    enable = enableAutoPerfect,
+    disable = disableAutoPerfect,
+    checkSkillCheck = checkSkillCheck
+}
 
 -- -- ═══════════════════════════════════════════════════════════════════════════
 -- -- AUTO PERFECT GENERATOR FUNCTIONS
