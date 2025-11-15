@@ -749,6 +749,26 @@ local function checkSkillCheck()
     
     -- Check if line is in the perfect zone
     local inPerfectZone = (diff >= offsetBefore - tolerance and diff <= offsetBefore + tolerance)
+
+    local function pressJump()
+        local virtualInputManager = game:GetService("VirtualInputManager")
+        
+        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+            -- Mobile: Tap posisi tombol jump default Roblox (kanan bawah)
+            local screenSize = workspace.CurrentCamera.ViewportSize
+            local tapX = screenSize.X * 0.85  -- Kanan
+            local tapY = screenSize.Y * 0.75  -- Bawah
+            
+            virtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, true, game, 0)
+            task.wait(0.01)
+            virtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, false, game, 0)
+        else
+            -- PC: Keyboard Space
+            virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.01)
+            virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+        end
+    end
     
     -- Only press if in perfect zone and haven't pressed this round
     if inPerfectZone and not pressedThisRound then
@@ -757,12 +777,13 @@ local function checkSkillCheck()
         if currentTime - lastPressTime >= 0.05 then
             -- Add 0.02 second (20ms) delay before pressing
             task.wait(0.02)
-            
-            -- Simulate space key press
-            local virtualInputManager = game:GetService("VirtualInputManager")
-            virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.01)
-            virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+
+            pressJump()
+            -- -- Simulate space key press
+            -- local virtualInputManager = game:GetService("VirtualInputManager")
+            -- virtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            -- task.wait(0.01)
+            -- virtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
             
             lastPressTime = currentTime
             pressedThisRound = true
