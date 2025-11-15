@@ -493,7 +493,7 @@ local function disableAllPlayerESP()
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- CROSSHAIR FUNCTIONS
+-- RESPONSIVE CROSSHAIR FUNCTIONS
 -- ═══════════════════════════════════════════════════════════════════════════
 
 local function createCrosshair()
@@ -505,6 +505,7 @@ local function createCrosshair()
     screenGui.Name = "CrosshairUI"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.IgnoreGuiInset = true -- Penting untuk mobile agar tidak terpengaruh notch/safe area
     
     local success = pcall(function()
         screenGui.Parent = CoreGui
@@ -513,19 +514,63 @@ local function createCrosshair()
         screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     end
     
+    -- Deteksi platform
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    local isTablet = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and workspace.CurrentCamera.ViewportSize.X > 600
+    local isConsole = UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled
+    
+    -- Ukuran responsif berdasarkan platform
+    local crosshairSize = 40
+    local lineLength = 20
+    local lineThickness = 2
+    local centerDotSize = 4
+    
+    if isMobile and not isTablet then
+        -- Mobile phone: crosshair lebih besar
+        crosshairSize = 60
+        lineLength = 30
+        lineThickness = 3
+        centerDotSize = 6
+    elseif isTablet then
+        -- Tablet: ukuran sedang
+        crosshairSize = 50
+        lineLength = 25
+        lineThickness = 2.5
+        centerDotSize = 5
+    elseif isConsole then
+        -- Console: ukuran standar dengan garis lebih tebal
+        crosshairSize = 45
+        lineLength = 22
+        lineThickness = 2.5
+        centerDotSize = 5
+    end
+    
     -- Main Crosshair Frame
     local crosshairFrame = Instance.new("Frame")
     crosshairFrame.Name = "CrosshairFrame"
-    crosshairFrame.Size = UDim2.new(0, 40, 0, 40)
-    crosshairFrame.Position = UDim2.new(0.5, -20, 0.5, -20)
+    crosshairFrame.Size = UDim2.new(0, crosshairSize, 0, crosshairSize)
+    crosshairFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    crosshairFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     crosshairFrame.BackgroundTransparency = 1
     crosshairFrame.Parent = screenGui
+    
+    -- UIAspectRatioConstraint untuk menjaga bentuk square
+    local aspectRatio = Instance.new("UIAspectRatioConstraint")
+    aspectRatio.AspectRatio = 1
+    aspectRatio.Parent = crosshairFrame
+    
+    -- UISizeConstraint untuk mencegah crosshair terlalu besar/kecil
+    local sizeConstraint = Instance.new("UISizeConstraint")
+    sizeConstraint.MinSize = Vector2.new(30, 30)
+    sizeConstraint.MaxSize = Vector2.new(100, 100)
+    sizeConstraint.Parent = crosshairFrame
     
     -- Horizontal Line
     local horizontalLine = Instance.new("Frame")
     horizontalLine.Name = "HorizontalLine"
-    horizontalLine.Size = UDim2.new(0, 20, 0, 2)
-    horizontalLine.Position = UDim2.new(0.5, -10, 0.5, -1)
+    horizontalLine.Size = UDim2.new(0.5, 0, 0, lineThickness)
+    horizontalLine.AnchorPoint = Vector2.new(0.5, 0.5)
+    horizontalLine.Position = UDim2.new(0.5, 0, 0.5, 0)
     horizontalLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     horizontalLine.BorderSizePixel = 0
     horizontalLine.Parent = crosshairFrame
@@ -539,8 +584,9 @@ local function createCrosshair()
     -- Vertical Line
     local verticalLine = Instance.new("Frame")
     verticalLine.Name = "VerticalLine"
-    verticalLine.Size = UDim2.new(0, 2, 0, 20)
-    verticalLine.Position = UDim2.new(0.5, -1, 0.5, -10)
+    verticalLine.Size = UDim2.new(0, lineThickness, 0.5, 0)
+    verticalLine.AnchorPoint = Vector2.new(0.5, 0.5)
+    verticalLine.Position = UDim2.new(0.5, 0, 0.5, 0)
     verticalLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     verticalLine.BorderSizePixel = 0
     verticalLine.Parent = crosshairFrame
@@ -551,11 +597,12 @@ local function createCrosshair()
     verticalStroke.Thickness = 1
     verticalStroke.Parent = verticalLine
     
-    -- Center Dot (optional)
+    -- Center Dot
     local centerDot = Instance.new("Frame")
     centerDot.Name = "CenterDot"
-    centerDot.Size = UDim2.new(0, 4, 0, 4)
-    centerDot.Position = UDim2.new(0.5, -2, 0.5, -2)
+    centerDot.Size = UDim2.new(0.1, 0, 0.1, 0)
+    centerDot.AnchorPoint = Vector2.new(0.5, 0.5)
+    centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
     centerDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     centerDot.BorderSizePixel = 0
     centerDot.Parent = crosshairFrame
@@ -568,6 +615,65 @@ local function createCrosshair()
     dotStroke.Color = Color3.fromRGB(0, 0, 0)
     dotStroke.Thickness = 1
     dotStroke.Parent = centerDot
+    
+    -- UIAspectRatioConstraint untuk center dot
+    local dotAspectRatio = Instance.new("UIAspectRatioConstraint")
+    dotAspectRatio.AspectRatio = 1
+    dotAspectRatio.Parent = centerDot
+    
+    -- Update crosshair saat viewport berubah (rotasi device, resize window)
+    local function updateCrosshairSize()
+        local viewportSize = workspace.CurrentCamera.ViewportSize
+        local isMobileNow = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+        local isTabletNow = isMobileNow and viewportSize.X > 600
+        local isConsoleNow = UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled
+        
+        -- Update ukuran berdasarkan platform dan orientasi
+        local newCrosshairSize = 40
+        local newLineLength = 20
+        local newLineThickness = 2
+        local newCenterDotSize = 4
+        
+        if isMobileNow and not isTabletNow then
+            -- Cek orientasi untuk mobile
+            if viewportSize.X > viewportSize.Y then
+                -- Landscape: ukuran sedang
+                newCrosshairSize = 50
+                newLineLength = 25
+                newLineThickness = 2.5
+                newCenterDotSize = 5
+            else
+                -- Portrait: ukuran besar
+                newCrosshairSize = 60
+                newLineLength = 30
+                newLineThickness = 3
+                newCenterDotSize = 6
+            end
+        elseif isTabletNow then
+            newCrosshairSize = 50
+            newLineLength = 25
+            newLineThickness = 2.5
+            newCenterDotSize = 5
+        elseif isConsoleNow then
+            newCrosshairSize = 45
+            newLineLength = 22
+            newLineThickness = 2.5
+            newCenterDotSize = 5
+        end
+        
+        -- Apply perubahan ukuran dengan smooth transition
+        crosshairFrame.Size = UDim2.new(0, newCrosshairSize, 0, newCrosshairSize)
+        horizontalLine.Size = UDim2.new(0, newLineLength, 0, newLineThickness)
+        verticalLine.Size = UDim2.new(0, newLineThickness, 0, newLineLength)
+        centerDot.Size = UDim2.new(0, newCenterDotSize, 0, newCenterDotSize)
+    end
+    
+    -- Monitor perubahan viewport
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateCrosshairSize)
+    
+    -- Monitor perubahan input device (untuk kasus user menghubungkan/melepas controller)
+    UserInputService.GamepadConnected:Connect(updateCrosshairSize)
+    UserInputService.GamepadDisconnected:Connect(updateCrosshairSize)
     
     crosshairUI = screenGui
 end
